@@ -10,4 +10,6 @@ def count_op(config: yacs.config.CfgNode, model: nn.Module) -> Tuple[str, str]:
                         config.dataset.image_size, config.dataset.image_size),
                        dtype=torch.float32,
                        device=torch.device(config.device))
-    return thop.clever_format(thop.profile(model, (data, ), verbose=False))
+    env_info=torch.zeros(1,config.environment.n_env_info,dtype=torch.float32,
+                       device=torch.device(config.device))
+    return thop.clever_format(thop.profile(model, (data, env_info,), verbose=False))

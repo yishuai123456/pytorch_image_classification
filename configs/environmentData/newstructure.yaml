@@ -1,0 +1,85 @@
+device: cuda
+
+dataset:
+  name: Environment_BtyAndSSP
+  dataset_dir: "D:/project/environmentFactor/environmentFactorDataset/dataset_btyAndSSP/labeled"
+  image_size: 80
+  n_channels: 251
+  n_classes: 10 #表示输出几种环境分类
+
+
+environment:
+  nums: 2  #表示输入了几种环境
+  channels: [1,250]  #每种环境对应的深度，总的环境深度为数组的和
+  fc: 100 #每种环境提取成特征向量的长度
+  n_env_info: 3 #表示有几种非环境参数
+
+model:
+  type: cifar
+  name: resnet_preact_environment
+  init_mode: kaiming_fan_out
+  resnet_preact:
+    depth: 20
+    initial_channels: 16
+    block_type: basic
+    remove_first_relu: False
+    add_last_bn: False
+    preact_stage: [True, True, True]
+train:
+  start_epoch: 0
+  topk: (1,2)
+  seed: 0
+  precision: O0
+  batch_size: 32
+  subdivision: 1
+  optimizer: sgd
+  base_lr: 0.1
+  momentum: 0.9
+  nesterov: True
+  weight_decay: 1e-4
+  output_dir: experiments/cifar10/resnet_preact/expEnvironment_BtyAndSSP_addEnvInfo
+  log_period: 100
+  checkpoint_period: 5
+  val_ratio: 0.0
+  use_test_as_val: True
+  use_tensorboard: True
+  distributed: False
+  dataloader:
+    num_workers: 2
+    drop_last: True
+    pin_memory: False
+validation:
+  batch_size: 8
+  dataloader:
+    num_workers: 2
+    drop_last: False
+    pin_memory: False
+scheduler:
+  epochs: 160
+  type: multistep
+  milestones: [80, 120]
+  lr_decay: 0.1
+augmentation:
+  use_random_crop: False #原来是True
+  use_random_horizontal_flip: False
+  use_cutout: False
+  use_random_erasing: False
+  use_dual_cutout: False
+  use_mixup: False
+  use_ricap: False
+  use_cutmix: False
+  use_label_smoothing: False
+  random_crop:
+    padding: 4
+    fill: 0
+    padding_mode: constant
+  random_horizontal_flip:
+    prob: 0.5
+tensorboard:
+  train_images: False
+  val_images: False
+  model_params: False
+
+
+
+

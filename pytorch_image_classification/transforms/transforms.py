@@ -26,6 +26,20 @@ class Normalize:
         image = (image - self.mean) / self.std
         return image
 
+class EnvironmentNormalize:
+    def __init__(self,means,stds):
+        self.means=means
+        self.stds=stds
+
+
+    def __call__(self,sample):
+        data=sample
+        if len(data.shape)   != 3:
+            data=data-self.means[0]/self.stds[0]
+        else:
+            data[:,:,0]=(data[:,:,0]-self.means[0])/self.stds[0]
+            data[:, :,1:-1] = (data[:, :,1:-1] - self.means[1]) / self.stds[1]
+        return data
 
 class RandomCrop:
     def __init__(self, config: yacs.config.CfgNode):

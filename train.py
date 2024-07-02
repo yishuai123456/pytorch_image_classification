@@ -70,13 +70,14 @@ def load_config():
     return config
 
 
-def subdivide_batch(config, data, targets):
+def subdivide_batch(config, data,env_info, targets):
     subdivision = config.train.subdivision
 
     if subdivision == 1:
-        return [data], [targets]
+        return [data],[env_info], [targets]
 
     data_chunks = data.chunk(subdivision)
+    env_info_chunks = env_info.chunk(subdivision)
     if config.augmentation.use_mixup or config.augmentation.use_cutmix:
         targets1, targets2, lam = targets
         target_chunks = [(chunk1, chunk2, lam) for chunk1, chunk2 in zip(
@@ -88,7 +89,7 @@ def subdivide_batch(config, data, targets):
         target_chunks = [(chunk, weights) for chunk in target_list_chunks]
     else:
         target_chunks = targets.chunk(subdivision)
-    return data_chunks, target_chunks
+    return data_chunks,env_info_chunks, target_chunks
 
 
 def send_targets_to_device(config, targets, device):
@@ -118,7 +119,7 @@ def train(epoch, config, model, optimizer, scheduler, loss_func, train_loader,
     acc1_meter = AverageMeter()
     acc5_meter = AverageMeter()
     start = time.time()
-    for step, (data, targets) in enumerate(train_loader):
+    for step, (data,env_info, targets) in enumerate(train_loader):
         step += 1
         global_step += 1
 
@@ -131,25 +132,27 @@ def train(epoch, config, model, optimizer, scheduler, loss_func, train_loader,
 
         data = data.to(device,
                        non_blocking=config.train.dataloader.non_blocking)
+        env_info = env_info.to(device, non_blocking=config.train.dataloader.non_blocking)
         targets = send_targets_to_device(config, targets, device)
 
-        data_chunks, target_chunks = subdivide_batch(config, data, targets)
+        data_chunks, env_info_chunks, target_chunks = subdivide_batch(config, data,env_info, targets)
         optimizer.zero_grad()
         outputs = []
         losses = []
-        for data_chunk, target_chunk in zip(data_chunks, target_chunks):
+        for data_chunk, env_info_chunk, target_chunk in zip(data_chunks,env_info_chunks, target_chunks):
             if config.augmentation.use_dual_cutout:
                 w = data_chunk.size(3) // 2
                 data1 = data_chunk[:, :, :, :w]
                 data2 = data_chunk[:, :, :, w:]
-                outputs1 = model(data1)
-                outputs2 = model(data2)
+                outputs1 = model(data1,env_info_chunk)
+                outputs2 = model(data2,env_info_chunk)
                 output_chunk = torch.cat(
                     (outputs1.unsqueeze(1), outputs2.unsqueeze(1)), dim=1)
             else:
-                output_chunk = model(data_chunk)
+                output_chunk = model(data_chunk,env_info_chunk)
             outputs.append(output_chunk)
 
+            #print(target_chunk)
             loss = loss_func(output_chunk, target_chunk)
             losses.append(loss)
             if config.device != 'cpu' and config.train.use_apex:
@@ -176,7 +179,7 @@ def train(epoch, config, model, optimizer, scheduler, loss_func, train_loader,
                                       outputs,
                                       targets,
                                       augmentation=True,
-                                      topk=(1, 5))
+                                      topk=config.train.topk)
 
         loss = sum(losses)
         if config.train.distributed:
@@ -255,7 +258,7 @@ def validate(epoch, config, model, loss_func, val_loader, logger,
     acc5_meter = AverageMeter()
     start = time.time()
     with torch.no_grad():
-        for step, (data, targets) in enumerate(val_loader):
+        for step, (data,env_info, targets) in enumerate(val_loader):
             if get_rank() == 0:
                 if config.tensorboard.val_images:
                     if epoch == 0 and step == 0:
@@ -266,9 +269,11 @@ def validate(epoch, config, model, loss_func, val_loader, logger,
 
             data = data.to(
                 device, non_blocking=config.validation.dataloader.non_blocking)
+            env_info = env_info.to(
+                device, non_blocking=config.validation.dataloader.non_blocking)
             targets = targets.to(device)
 
-            outputs = model(data)
+            outputs = model(data,env_info)
             loss = loss_func(outputs, targets)
 
             acc1, acc5 = compute_accuracy(config,

@@ -48,3 +48,4 @@ def accuracy(outputs, targets, topk=(1, )):
             correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(1 / batch_size))
     return res
+

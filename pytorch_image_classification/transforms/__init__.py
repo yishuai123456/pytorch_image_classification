@@ -12,6 +12,7 @@ from .transforms import (
     RandomResizeCrop,
     Resize,
     ToTensor,
+    EnvironmentNormalize
 )
 
 from .cutout import Cutout, DualCutout
@@ -42,6 +43,16 @@ def _get_dataset_stats(
         # RGB
         mean = [0.485, 0.456, 0.406]
         std = [0.229, 0.224, 0.225]
+    elif name == 'Environment':
+        mean = [104.75, 1500]
+        std = [23.28, 10]
+    elif name=='Environment_Bty':
+        mean=np.array([104.75])
+        std=np.array([23.28])
+
+    elif name=='Environment_BtyAndSSP':
+        mean=[2000,1500]
+        std=[10,5]
     else:
         raise ValueError()
     return mean, std
@@ -52,8 +63,10 @@ def create_transform(config: yacs.config.CfgNode, is_train: bool) -> Callable:
         return create_cifar_transform(config, is_train)
     elif config.model.type == 'imagenet':
         return create_imagenet_transform(config, is_train)
+
     else:
         raise ValueError
+
 
 
 def create_cifar_transform(config: yacs.config.CfgNode,
@@ -66,7 +79,10 @@ def create_cifar_transform(config: yacs.config.CfgNode,
         if config.augmentation.use_random_horizontal_flip:
             transforms.append(RandomHorizontalFlip(config))
 
-        transforms.append(Normalize(mean, std))
+        if 'Environment' in config.dataset.name:
+            transforms.append(EnvironmentNormalize(mean, std))
+        else:
+            transforms.append(Normalize(mean, std))
 
         if config.augmentation.use_cutout:
             transforms.append(Cutout(config))
@@ -77,10 +93,12 @@ def create_cifar_transform(config: yacs.config.CfgNode,
 
         transforms.append(ToTensor())
     else:
-        transforms = [
-            Normalize(mean, std),
-            ToTensor(),
-        ]
+        transforms = []
+        if 'Environment' in config.dataset.name:
+            transforms.append(EnvironmentNormalize(mean, std))
+        else:
+            transforms.append(Normalize(mean, std))
+        transforms.append(ToTensor())
 
     return torchvision.transforms.Compose(transforms)
 

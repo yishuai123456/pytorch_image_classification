@@ -90,12 +90,13 @@ config.model.se_resnet_preact.preact_stage = [True, True, True]
 config.train = ConfigNode()
 config.train.checkpoint = ''
 config.train.resume = False
-config.train.use_apex = True
+config.train.use_apex = False
 # optimization level for NVIDIA apex
 # O0 = fp32
 # O1 = mixed precision
 # O2 = almost fp16
 # O3 = fp16
+config.train.topk=(1,5)
 config.train.precision = 'O0'
 config.train.batch_size = 128
 config.train.subdivision = 1
@@ -240,6 +241,13 @@ config.test.batch_size = 256
 config.test.dataloader = ConfigNode()
 config.test.dataloader.num_workers = 2
 config.test.dataloader.pin_memory = False
+
+#enviroment config
+config.environment = ConfigNode()
+config.environment.nums = 1
+config.environment.channels = [1]
+config.environment.fc=10
+config.environment.n_env_info=3
 
 
 def get_default_config():
